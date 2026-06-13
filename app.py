@@ -8,7 +8,7 @@ from flask import Flask, abort, request
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import ApiClient, Configuration, MessagingApiBlob, MessagingApi, ReplyMessageRequest, PushMessageRequest, TextMessage
-from linebot.v3.webhooks import MessageEvent, VideoMessageContent
+from linebot.v3.webhooks import MessageEvent, VideoMessageContent, ImageMessageContent
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
@@ -54,14 +54,14 @@ def get_drive_service():
     return build("drive", "v3", credentials=creds)
 
 
-def upload_to_drive(file_path: Path):
+def upload_to_drive(file_path: Path, mimetype: str = "video/mp4"):
     try:
         service = get_drive_service()
         file_metadata = {
             "name": file_path.name,
             "parents": [GOOGLE_DRIVE_FOLDER_ID],
         }
-        media = MediaFileUpload(str(file_path), mimetype="video/mp4", resumable=True)
+        media = MediaFileUpload(str(file_path), mimetype=mimetype, resumable=True)
         uploaded = service.files().create(
             body=file_metadata, media_body=media, fields="id, name"
         ).execute()
@@ -70,9 +70,16 @@ def upload_to_drive(file_path: Path):
         print(f"[Drive] 上傳失敗：{e}")
 
 
-def download_and_save(message_id: str, chat_id: str):
+def download_and_save(message_id: str, chat_id: str, media_type: str = "video"):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"video_{timestamp}_{message_id}.mp4"
+
+    if media_type == "image":
+        filename = f"image_{timestamp}_{message_id}.jpg"
+        mimetype = "image/jpeg"
+    else:
+        filename = f"video_{timestamp}_{message_id}.mp4"
+        mimetype = "video/mp4"
+
     file_path = DOWNLOAD_DIR / filename
 
     with ApiClient(line_config) as api_client:
@@ -86,7 +93,7 @@ def download_and_save(message_id: str, chat_id: str):
     push_text(chat_id, f"📁 已存檔：{filename}")
 
     if UPLOAD_DRIVE and GOOGLE_DRIVE_FOLDER_ID:
-        upload_to_drive(file_path)
+        upload_to_drive(file_path, mimetype=mimetype)
         push_text(chat_id, "☁️ 已上傳至 Google 雲端硬碟")
         if not SAVE_LOCAL:
             file_path.unlink()
@@ -133,7 +140,20 @@ def handle_video(event):
     chat_id = event.source.group_id if hasattr(event.source, "group_id") else event.source.user_id
     reply_text(reply_token, "✅ 已收到影片，存檔中...")
 
-    t = threading.Thread(target=download_and_save, args=(message_id, chat_id), daemon=True)
+    t = threading.Thread(target=download_and_save, args=(message_id, chat_id, "video"), daemon=True)
+    t.start()
+
+
+@handler.add(MessageEvent, message=ImageMessageContent)
+def handle_image(event):
+    message_id = event.message.id
+    reply_token = event.reply_token
+    print(f"[LINE] 收到圖片訊息 id={message_id}")
+
+    chat_id = event.source.group_id if hasattr(event.source, "group_id") else event.source.user_id
+    reply_text(reply_token, "✅ 已收到圖片，存檔中...")
+
+    t = threading.Thread(target=download_and_save, args=(message_id, chat_id, "image"), daemon=True)
     t.start()
 
 
