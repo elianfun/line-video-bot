@@ -188,6 +188,20 @@ ps aux | grep app.py   # 找到 PID
 kill PID               # 停止
 ```
 
+ngrok 也可以同樣方式背景執行：
+
+```bash
+nohup ngrok http 5000 > ngrok.log 2>&1 &
+```
+
+查看 ngrok 對外網址：
+
+```bash
+cat ngrok.log
+# 或用 API 查詢
+curl http://localhost:4040/api/tunnels
+```
+
 ---
 
 #### 方法 B：screen（可隨時回來查看 log）
@@ -213,6 +227,15 @@ python app.py
 ```bash
 screen -r linebot
 ```
+
+ngrok 也可以開一個獨立 session：
+
+```bash
+screen -S ngrok
+ngrok http 5000
+```
+
+按 `Ctrl + A`，再按 `D` 離開。
 
 ---
 
@@ -261,6 +284,43 @@ sudo systemctl status line-video-bot
 
 ```bash
 journalctl -u line-video-bot -f
+```
+
+若要同時用 systemd 管理 ngrok，建立第二個 service：
+
+```bash
+sudo nano /etc/systemd/system/ngrok.service
+```
+
+貼入以下內容：
+
+```ini
+[Unit]
+Description=ngrok tunnel
+After=network.target
+
+[Service]
+User=你的使用者名稱
+ExecStart=/usr/bin/ngrok http 5000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+啟用：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable ngrok
+sudo systemctl start ngrok
+```
+
+查看 ngrok 對外網址：
+
+```bash
+curl http://localhost:4040/api/tunnels
 ```
 
 ---
