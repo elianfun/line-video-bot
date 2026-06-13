@@ -1,0 +1,18 @@
+# 敏感憑證 - 絕對不能上傳
+.env
+credentials.json
+oauth_credentials.json
+token.json
+
+# 下載的影片
+downloads/
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# 系統檔
+.DS_Store
+Thumbs.db
