@@ -336,10 +336,6 @@ UPLOAD_DRIVE=true
 | `UPLOAD_DRIVE` | `true` = 啟用上傳 Google Drive |
 | `TELEGRAM_BOT_TOKEN` | BotFather 取得（選填，留空則不發布） |
 | `TELEGRAM_CHANNEL_ID` | Channel 帳號如 `@mychannel` 或數字 ID（選填） |
-| `X_API_KEY` | X Developer Portal 取得（選填，留空則不發布） |
-| `X_API_SECRET` | X Developer Portal 取得 |
-| `X_ACCESS_TOKEN` | X Developer Portal 取得 |
-| `X_ACCESS_SECRET` | X Developer Portal 取得 |
 
 ---
 
@@ -359,21 +355,6 @@ UPLOAD_DRIVE=true
 > ⚠️ Telegram Bot API 單檔上傳限制為 **50MB**。
 
 ---
-
-## 設定 X (Twitter) 發布
-
-1. 前往 [X Developer Portal](https://developer.x.com/) 建立 App
-2. 需申請 **Free 或 Basic** 等級（免費帳號可發文，但**影片上傳**需 Basic 以上）
-3. 在 App 設定中開啟 **Read and Write** 權限，並啟用 **OAuth 1.0a**
-4. 取得四組金鑰，填入 `.env`：
-   ```env
-   X_API_KEY=...
-   X_API_SECRET=...
-   X_ACCESS_TOKEN=...
-   X_ACCESS_SECRET=...
-   ```
-
-> ⚠️ 圖片限制 **5MB**，影片限制 **512MB**。免費帳號僅能上傳圖片。
 
 ---
 
