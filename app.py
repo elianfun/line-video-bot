@@ -112,7 +112,9 @@ def upload_to_drive(file_path: Path, mimetype: str):
 
 
 def post_to_telegram(file_path: Path, mimetype: str, caption: str):
-    bot = Bot(token=TELEGRAM_BOT_TOKEN, base_url="http://localhost:8081/bot")
+    from telegram.request import HTTPXRequest
+    request = HTTPXRequest(read_timeout=300, write_timeout=300, connect_timeout=30)
+    bot = Bot(token=TELEGRAM_BOT_TOKEN, base_url="http://localhost:8081/bot", request=request)
 
     async def _send():
         with open(file_path, "rb") as f:
