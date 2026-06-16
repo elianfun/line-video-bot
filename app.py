@@ -1,6 +1,8 @@
 import asyncio
+import json
 import os
 import queue
+import subprocess
 import threading
 import time
 from datetime import datetime
@@ -111,6 +113,18 @@ def upload_to_drive(file_path: Path, mimetype: str):
     print(f"[Drive] 已上傳：{uploaded['name']} (id={uploaded['id']})")
 
 
+def get_video_dimensions(file_path: Path):
+    result = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", str(file_path)],
+        capture_output=True, text=True
+    )
+    streams = json.loads(result.stdout).get("streams", [])
+    for s in streams:
+        if s.get("codec_type") == "video":
+            return s.get("width", 0), s.get("height", 0)
+    return 0, 0
+
+
 def post_to_telegram(file_path: Path, mimetype: str, caption: str):
     from telegram.request import HTTPXRequest
     request = HTTPXRequest(read_timeout=300, write_timeout=300, connect_timeout=30)
@@ -119,7 +133,14 @@ def post_to_telegram(file_path: Path, mimetype: str, caption: str):
     async def _send():
         with open(file_path, "rb") as f:
             if mimetype.startswith("video"):
-                await bot.send_video(chat_id=TELEGRAM_CHANNEL_ID, video=f, caption=caption)
+                width, height = get_video_dimensions(file_path)
+                await bot.send_video(
+                    chat_id=TELEGRAM_CHANNEL_ID,
+                    video=f,
+                    caption=caption,
+                    width=width or None,
+                    height=height or None,
+                )
             else:
                 await bot.send_photo(chat_id=TELEGRAM_CHANNEL_ID, photo=f, caption=caption)
 
