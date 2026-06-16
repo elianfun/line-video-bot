@@ -7,8 +7,16 @@ from dotenv import load_dotenv
 from flask import Flask, abort, request
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.messaging import ApiClient, Configuration, MessagingApiBlob, MessagingApi, ReplyMessageRequest, PushMessageRequest, TextMessage
-from linebot.v3.webhooks import MessageEvent, VideoMessageContent, ImageMessageContent
+from linebot.v3.messaging import (
+    ApiClient,
+    Configuration,
+    MessagingApi,
+    MessagingApiBlob,
+    PushMessageRequest,
+    ReplyMessageRequest,
+    TextMessage,
+)
+from linebot.v3.webhooks import ImageMessageContent, MessageEvent, VideoMessageContent
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
@@ -34,43 +42,75 @@ UPLOAD_DRIVE = os.environ.get("UPLOAD_DRIVE", "false").lower() == "true"
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 line_config = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 
+_drive_service = None
+_drive_lock = threading.Lock()
+
 
 def get_drive_service():
-    creds = None
-    token_path = BASE_DIR / "token.json"
-    oauth_path = BASE_DIR / "oauth_credentials.json"
+    global _drive_service
+    if _drive_service is not None:
+        return _drive_service
 
-    if token_path.exists():
-        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+    with _drive_lock:
+        if _drive_service is not None:
+            return _drive_service
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(str(oauth_path), SCOPES)
-            creds = flow.run_local_server(port=0)
-        token_path.write_text(creds.to_json())
+        creds = None
+        token_path = BASE_DIR / "token.json"
+        oauth_path = BASE_DIR / "oauth_credentials.json"
 
-    return build("drive", "v3", credentials=creds)
+        if token_path.exists():
+            creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
 
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(str(oauth_path), SCOPES)
+                creds = flow.run_local_server(port=0)
+            token_path.write_text(creds.to_json())
 
-def upload_to_drive(file_path: Path, mimetype: str = "video/mp4"):
-    try:
-        service = get_drive_service()
-        file_metadata = {
-            "name": file_path.name,
-            "parents": [GOOGLE_DRIVE_FOLDER_ID],
-        }
-        media = MediaFileUpload(str(file_path), mimetype=mimetype, resumable=True)
-        uploaded = service.files().create(
-            body=file_metadata, media_body=media, fields="id, name"
-        ).execute()
-        print(f"[Drive] 已上傳：{uploaded['name']} (id={uploaded['id']})")
-    except Exception as e:
-        print(f"[Drive] 上傳失敗：{e}")
+        _drive_service = build("drive", "v3", credentials=creds)
+
+    return _drive_service
 
 
-def download_and_save(message_id: str, chat_id: str, media_type: str = "video"):
+def upload_to_drive(file_path: Path, mimetype: str):
+    service = get_drive_service()
+    file_metadata = {
+        "name": file_path.name,
+        "parents": [GOOGLE_DRIVE_FOLDER_ID],
+    }
+    media = MediaFileUpload(str(file_path), mimetype=mimetype, resumable=True)
+    uploaded = service.files().create(
+        body=file_metadata, media_body=media, fields="id, name"
+    ).execute()
+    print(f"[Drive] 已上傳：{uploaded['name']} (id={uploaded['id']})")
+
+
+def get_chat_id(event) -> str:
+    source = event.source
+    return getattr(source, "group_id", None) or source.user_id
+
+
+def push_text(to: str, text: str):
+    with ApiClient(line_config) as api_client:
+        MessagingApi(api_client).push_message(
+            PushMessageRequest(to=to, messages=[TextMessage(text=text)])
+        )
+
+
+def reply_text(reply_token: str, text: str):
+    with ApiClient(line_config) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[TextMessage(text=text)],
+            )
+        )
+
+
+def download_and_save(message_id: str, chat_id: str, media_type: str):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if media_type == "image":
@@ -82,22 +122,27 @@ def download_and_save(message_id: str, chat_id: str, media_type: str = "video"):
 
     file_path = DOWNLOAD_DIR / filename
 
-    with ApiClient(line_config) as api_client:
-        blob_api = MessagingApiBlob(api_client)
-        content = blob_api.get_message_content(message_id)
+    try:
+        with ApiClient(line_config) as api_client:
+            content = MessagingApiBlob(api_client).get_message_content(message_id)
 
-    with open(file_path, "wb") as f:
-        f.write(content)
+        file_path.write_bytes(content)
+        print(f"[本地] 已儲存：{file_path}")
+        push_text(chat_id, f"📁 已存檔：{filename}")
 
-    print(f"[本地] 已儲存：{file_path}")
-    push_text(chat_id, f"📁 已存檔：{filename}")
+        if UPLOAD_DRIVE and GOOGLE_DRIVE_FOLDER_ID:
+            upload_to_drive(file_path, mimetype=mimetype)
+            push_text(chat_id, "☁️ 已上傳至 Google 雲端硬碟")
+            if not SAVE_LOCAL:
+                file_path.unlink()
+                print(f"[本地] 已刪除暫存：{file_path.name}")
 
-    if UPLOAD_DRIVE and GOOGLE_DRIVE_FOLDER_ID:
-        upload_to_drive(file_path, mimetype=mimetype)
-        push_text(chat_id, "☁️ 已上傳至 Google 雲端硬碟")
-        if not SAVE_LOCAL:
-            file_path.unlink()
-            print(f"[本地] 已刪除暫存：{file_path.name}")
+    except Exception as e:
+        print(f"[錯誤] 處理失敗 (id={message_id})：{e}")
+        try:
+            push_text(chat_id, f"❌ 存檔失敗，請稍後再試。")
+        except Exception:
+            pass
 
 
 @app.route("/callback", methods=["POST"])
@@ -111,50 +156,26 @@ def callback():
     return "OK"
 
 
-def reply_text(reply_token: str, text: str):
-    with ApiClient(line_config) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text=text)],
-            )
-        )
-
-
-def push_text(to: str, text: str):
-    with ApiClient(line_config) as api_client:
-        MessagingApi(api_client).push_message(
-            PushMessageRequest(
-                to=to,
-                messages=[TextMessage(text=text)],
-            )
-        )
-
-
 @handler.add(MessageEvent, message=VideoMessageContent)
 def handle_video(event):
     message_id = event.message.id
-    reply_token = event.reply_token
     print(f"[LINE] 收到影片訊息 id={message_id}")
-
-    chat_id = event.source.group_id if hasattr(event.source, "group_id") else event.source.user_id
-    reply_text(reply_token, "✅ 已收到影片，存檔中...")
-
-    t = threading.Thread(target=download_and_save, args=(message_id, chat_id, "video"), daemon=True)
-    t.start()
+    chat_id = get_chat_id(event)
+    reply_text(event.reply_token, "✅ 已收到影片，存檔中...")
+    threading.Thread(
+        target=download_and_save, args=(message_id, chat_id, "video"), daemon=True
+    ).start()
 
 
 @handler.add(MessageEvent, message=ImageMessageContent)
 def handle_image(event):
     message_id = event.message.id
-    reply_token = event.reply_token
     print(f"[LINE] 收到圖片訊息 id={message_id}")
-
-    chat_id = event.source.group_id if hasattr(event.source, "group_id") else event.source.user_id
-    reply_text(reply_token, "✅ 已收到圖片，存檔中...")
-
-    t = threading.Thread(target=download_and_save, args=(message_id, chat_id, "image"), daemon=True)
-    t.start()
+    chat_id = get_chat_id(event)
+    reply_text(event.reply_token, "✅ 已收到圖片，存檔中...")
+    threading.Thread(
+        target=download_and_save, args=(message_id, chat_id, "image"), daemon=True
+    ).start()
 
 
 if __name__ == "__main__":

@@ -67,12 +67,7 @@ cd C:\Users\你的名字\line-video-bot
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
-pip install line-bot-sdk==3.12.0
-pip install google-auth-oauthlib google-api-python-client google-auth-httplib2
 ```
-
-> ⚠️ `line-bot-sdk 3.13+` 在 Python 3.12 上有語法 bug 會導致無法啟動，請固定使用 `3.12.0`。  
-> Google 相關套件（`google-auth-oauthlib` 等）需另外安裝，`requirements.txt` 不一定含括。
 
 ### 4. 設定 .env
 
@@ -144,12 +139,7 @@ cd ~/line-video-bot
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-pip install line-bot-sdk==3.12.0
-pip install google-auth-oauthlib google-api-python-client google-auth-httplib2
 ```
-
-> ⚠️ `line-bot-sdk 3.13+` 在 Python 3.12 上有語法 bug 會導致無法啟動，請固定使用 `3.12.0`。  
-> Google 相關套件（`google-auth-oauthlib` 等）需另外安裝，`requirements.txt` 不一定含括。
 
 ### 4. 設定 .env
 
@@ -439,18 +429,6 @@ Forwarding  https://xxxx-xxx-xxx.ngrok-free.app -> http://localhost:5000
 ---
 
 ## 常見問題
-
-**Q: 啟動時出現 `SyntaxError` 在 `text_message_v2.py`？**  
-`line-bot-sdk 3.13+` 在 Python 3.12 有 bug，執行以下指令降版：
-```bash
-pip install line-bot-sdk==3.12.0
-```
-
-**Q: 啟動時出現 `ModuleNotFoundError: No module named 'google_auth_oauthlib'`？**  
-Google 套件未安裝，執行：
-```bash
-pip install google-auth-oauthlib google-api-python-client google-auth-httplib2
-```
 
 **Q: Bot 收到訊息但沒有上傳到 Drive？**  
 確認 `.env` 中 `UPLOAD_DRIVE=true` 且 `GOOGLE_DRIVE_FOLDER_ID` 已填入正確 ID，並確認 `token.json` 存在且有效。
