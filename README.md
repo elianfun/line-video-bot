@@ -1,6 +1,6 @@
 # LINE 群組影片自動備份 Bot
 
-接收 LINE 群組中的影片，自動下載並上傳至 Google 雲端硬碟。
+接收 LINE 群組中的影片與圖片，自動下載並上傳至 Google 雲端硬碟，同時轉發到 Telegram Channel。
 
 ---
 
@@ -10,6 +10,7 @@
 - [Windows 安裝教學](#windows-安裝教學)
 - [Ubuntu Linux 安裝教學](#ubuntu-linux-安裝教學)
 - [設定 .env](#設定-env)
+- [設定 Telegram Channel 發布](#設定-telegram-channel-發布)
 - [首次授權 Google Drive](#首次授權-google-drive)
 - [使用 ngrok 對外開放](#使用-ngrok-對外開放)
 - [設定 LINE Webhook](#設定-line-webhook)
@@ -114,9 +115,16 @@ sudo apt install python3 python3-pip python3-venv -y
 python3 --version
 ```
 
-### 2. 複製專案到伺服器
+### 2. 取得專案
 
-**方法 A：從你的電腦上傳（用 scp）**
+**方法 A：從 GitHub clone（推薦）**
+
+```bash
+sudo apt install git -y
+git clone https://github.com/elianfun/line-video-bot.git
+```
+
+**方法 B：從你的電腦上傳（用 scp）**
 
 在你的 Windows 本機執行：
 
@@ -124,13 +132,22 @@ python3 --version
 scp -r C:\Users\你的名字\line-video-bot 使用者@伺服器IP:~/line-video-bot
 ```
 
-**方法 B：手動建立資料夾後上傳**
+**方法 C：手動建立資料夾後上傳**
 
 ```bash
 mkdir ~/line-video-bot
 ```
 
 再用 SFTP 或其他工具上傳檔案。
+
+**日後更新程式（方法 A 限定）**
+
+```bash
+cd ~/line-video-bot
+pkill -f "python app.py"
+git pull origin main
+nohup python app.py > bot.log 2>&1 &
+```
 
 ### 3. 建立虛擬環境並安裝套件
 
@@ -356,8 +373,6 @@ UPLOAD_DRIVE=true
 
 ---
 
----
-
 ## 首次授權 Google Drive
 
 若沒有一起複製 `token.json`，首次執行時會自動開啟瀏覽器進行 Google 授權：
@@ -462,3 +477,9 @@ Forwarding  https://xxxx-xxx-xxx.ngrok-free.app -> http://localhost:5000
 
 **Q: 影片只存到本機，沒有上傳？**  
 確認 `.env` 的 `UPLOAD_DRIVE=true`（注意大小寫），並重新啟動 Bot。
+
+**Q: Telegram 顯示「發布失敗」？**  
+常見原因：Bot 未加入 Channel 或未設為管理員、`TELEGRAM_CHANNEL_ID` 填錯。確認 Bot 是 Channel 管理員且有「發布訊息」權限，ID 格式為 `-100xxxxxxxxx`（私人）或 `@頻道名稱`（公開）。
+
+**Q: Telegram 發布成功但 bot.log 沒有顯示？**  
+nohup 模式下背景執行緒的 print 有時不會寫入 log，屬正常現象。可改用 `python app.py` 前景執行來查看完整輸出。
