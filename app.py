@@ -189,7 +189,7 @@ def download_and_save(message_id: str, chat_id: str, media_type: str):
                 print(f"[Telegram] 發布失敗：{e}")
                 push_text(chat_id, "❌ Telegram 發布失敗，請檢查設定。")
             finally:
-                time.sleep(3)
+                time.sleep(10)
 
     except Exception as e:
         print(f"[錯誤] 處理失敗 (id={message_id})：{e}")
