@@ -1,5 +1,6 @@
 import asyncio
 import os
+import queue
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -49,6 +50,19 @@ ENABLE_IMAGE = os.environ.get("ENABLE_IMAGE", "true").lower() == "true"
 
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 line_config = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
+
+# 排隊處理，避免同時下載多個檔案觸發 LINE API 限制
+_media_queue = queue.Queue()
+
+def _queue_worker():
+    while True:
+        message_id, chat_id, media_type = _media_queue.get()
+        try:
+            download_and_save(message_id, chat_id, media_type)
+        finally:
+            _media_queue.task_done()
+
+threading.Thread(target=_queue_worker, daemon=True).start()
 
 _drive_service = None
 _drive_lock = threading.Lock()
@@ -202,9 +216,7 @@ def handle_video(event):
     chat_id = get_chat_id(event)
     if not SILENT_MODE:
         reply_text(event.reply_token, "✅ 已收到影片，存檔中...")
-    threading.Thread(
-        target=download_and_save, args=(message_id, chat_id, "video"), daemon=True
-    ).start()
+    _media_queue.put((message_id, chat_id, "video"))
 
 
 @handler.add(MessageEvent, message=ImageMessageContent)
@@ -216,9 +228,7 @@ def handle_image(event):
     chat_id = get_chat_id(event)
     if not SILENT_MODE:
         reply_text(event.reply_token, "✅ 已收到圖片，存檔中...")
-    threading.Thread(
-        target=download_and_save, args=(message_id, chat_id, "image"), daemon=True
-    ).start()
+    _media_queue.put((message_id, chat_id, "image"))
 
 
 if __name__ == "__main__":
