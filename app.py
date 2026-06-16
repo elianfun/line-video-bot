@@ -44,6 +44,8 @@ UPLOAD_DRIVE = os.environ.get("UPLOAD_DRIVE", "false").lower() == "true"
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHANNEL_ID = os.environ.get("TELEGRAM_CHANNEL_ID", "")
 SILENT_MODE = os.environ.get("SILENT_MODE", "false").lower() == "true"
+ENABLE_VIDEO = os.environ.get("ENABLE_VIDEO", "true").lower() == "true"
+ENABLE_IMAGE = os.environ.get("ENABLE_IMAGE", "true").lower() == "true"
 
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 line_config = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
@@ -193,6 +195,8 @@ def callback():
 
 @handler.add(MessageEvent, message=VideoMessageContent)
 def handle_video(event):
+    if not ENABLE_VIDEO:
+        return
     message_id = event.message.id
     print(f"[LINE] 收到影片訊息 id={message_id}")
     chat_id = get_chat_id(event)
@@ -205,6 +209,8 @@ def handle_video(event):
 
 @handler.add(MessageEvent, message=ImageMessageContent)
 def handle_image(event):
+    if not ENABLE_IMAGE:
+        return
     message_id = event.message.id
     print(f"[LINE] 收到圖片訊息 id={message_id}")
     chat_id = get_chat_id(event)
