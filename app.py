@@ -1,8 +1,10 @@
+import asyncio
 import os
 import threading
 from datetime import datetime
 from pathlib import Path
 
+import tweepy
 from dotenv import load_dotenv
 from flask import Flask, abort, request
 from linebot.v3 import WebhookHandler
@@ -22,6 +24,7 @@ from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from telegram import Bot
 
 load_dotenv()
 
@@ -38,6 +41,14 @@ LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 GOOGLE_DRIVE_FOLDER_ID = os.environ.get("GOOGLE_DRIVE_FOLDER_ID", "")
 SAVE_LOCAL = os.environ.get("SAVE_LOCAL", "true").lower() == "true"
 UPLOAD_DRIVE = os.environ.get("UPLOAD_DRIVE", "false").lower() == "true"
+
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHANNEL_ID = os.environ.get("TELEGRAM_CHANNEL_ID", "")
+
+X_API_KEY = os.environ.get("X_API_KEY", "")
+X_API_SECRET = os.environ.get("X_API_SECRET", "")
+X_ACCESS_TOKEN = os.environ.get("X_ACCESS_TOKEN", "")
+X_ACCESS_SECRET = os.environ.get("X_ACCESS_SECRET", "")
 
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 line_config = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
@@ -88,6 +99,34 @@ def upload_to_drive(file_path: Path, mimetype: str):
     print(f"[Drive] 已上傳：{uploaded['name']} (id={uploaded['id']})")
 
 
+def post_to_telegram(file_path: Path, mimetype: str, caption: str):
+    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+
+    async def _send():
+        with open(file_path, "rb") as f:
+            if mimetype.startswith("video"):
+                await bot.send_video(chat_id=TELEGRAM_CHANNEL_ID, video=f, caption=caption)
+            else:
+                await bot.send_photo(chat_id=TELEGRAM_CHANNEL_ID, photo=f, caption=caption)
+
+    asyncio.run(_send())
+    print(f"[Telegram] 已發布：{file_path.name}")
+
+
+def post_to_x(file_path: Path, caption: str):
+    auth = tweepy.OAuth1UserHandler(X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET)
+    api_v1 = tweepy.API(auth)
+    client = tweepy.Client(
+        consumer_key=X_API_KEY,
+        consumer_secret=X_API_SECRET,
+        access_token=X_ACCESS_TOKEN,
+        access_token_secret=X_ACCESS_SECRET,
+    )
+    media = api_v1.media_upload(filename=str(file_path))
+    client.create_tweet(text=caption, media_ids=[media.media_id])
+    print(f"[X] 已發布：{file_path.name}")
+
+
 def get_chat_id(event) -> str:
     source = event.source
     return getattr(source, "group_id", None) or source.user_id
@@ -112,6 +151,7 @@ def reply_text(reply_token: str, text: str):
 
 def download_and_save(message_id: str, chat_id: str, media_type: str):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp_caption = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     if media_type == "image":
         filename = f"image_{timestamp}_{message_id}.jpg"
@@ -137,10 +177,28 @@ def download_and_save(message_id: str, chat_id: str, media_type: str):
                 file_path.unlink()
                 print(f"[本地] 已刪除暫存：{file_path.name}")
 
+        caption = f"📅 {timestamp_caption}"
+
+        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID:
+            try:
+                post_to_telegram(file_path, mimetype, caption)
+                push_text(chat_id, "📢 已發布到 Telegram Channel")
+            except Exception as e:
+                print(f"[Telegram] 發布失敗：{e}")
+                push_text(chat_id, "❌ Telegram 發布失敗，請檢查設定。")
+
+        if X_API_KEY and X_ACCESS_TOKEN:
+            try:
+                post_to_x(file_path, caption)
+                push_text(chat_id, "🐦 已發布到 X")
+            except Exception as e:
+                print(f"[X] 發布失敗：{e}")
+                push_text(chat_id, "❌ X 發布失敗，請檢查設定。")
+
     except Exception as e:
         print(f"[錯誤] 處理失敗 (id={message_id})：{e}")
         try:
-            push_text(chat_id, f"❌ 存檔失敗，請稍後再試。")
+            push_text(chat_id, "❌ 存檔失敗，請稍後再試。")
         except Exception:
             pass
 
