@@ -351,6 +351,7 @@ UPLOAD_DRIVE=true
 | `GOOGLE_DRIVE_FOLDER_ID` | Drive 資料夾網址最後一段 |
 | `SAVE_LOCAL` | `true` = 同時保留本機備份 |
 | `UPLOAD_DRIVE` | `true` = 啟用上傳 Google Drive |
+| `SILENT_MODE` | `true` = 靜默模式，不發送任何 LINE 通知（錯誤除外） |
 | `TELEGRAM_BOT_TOKEN` | BotFather 取得（選填，留空則不發布） |
 | `TELEGRAM_CHANNEL_ID` | Channel 帳號如 `@mychannel` 或數字 ID（選填） |
 

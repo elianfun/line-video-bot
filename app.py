@@ -43,6 +43,7 @@ UPLOAD_DRIVE = os.environ.get("UPLOAD_DRIVE", "false").lower() == "true"
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHANNEL_ID = os.environ.get("TELEGRAM_CHANNEL_ID", "")
+SILENT_MODE = os.environ.get("SILENT_MODE", "false").lower() == "true"
 
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 line_config = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
@@ -149,11 +150,13 @@ def download_and_save(message_id: str, chat_id: str, media_type: str):
 
         file_path.write_bytes(content)
         print(f"[本地] 已儲存：{file_path}")
-        push_text(chat_id, f"📁 已存檔：{filename}")
+        if not SILENT_MODE:
+            push_text(chat_id, f"📁 已存檔：{filename}")
 
         if UPLOAD_DRIVE and GOOGLE_DRIVE_FOLDER_ID:
             upload_to_drive(file_path, mimetype=mimetype)
-            push_text(chat_id, "☁️ 已上傳至 Google 雲端硬碟")
+            if not SILENT_MODE:
+                push_text(chat_id, "☁️ 已上傳至 Google 雲端硬碟")
             if not SAVE_LOCAL:
                 file_path.unlink()
                 print(f"[本地] 已刪除暫存：{file_path.name}")
@@ -163,7 +166,8 @@ def download_and_save(message_id: str, chat_id: str, media_type: str):
         if TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID:
             try:
                 post_to_telegram(file_path, mimetype, caption)
-                push_text(chat_id, "📢 已發布到 Telegram Channel")
+                if not SILENT_MODE:
+                    push_text(chat_id, "📢 已發布到 Telegram Channel")
             except Exception as e:
                 print(f"[Telegram] 發布失敗：{e}")
                 push_text(chat_id, "❌ Telegram 發布失敗，請檢查設定。")
@@ -192,7 +196,8 @@ def handle_video(event):
     message_id = event.message.id
     print(f"[LINE] 收到影片訊息 id={message_id}")
     chat_id = get_chat_id(event)
-    reply_text(event.reply_token, "✅ 已收到影片，存檔中...")
+    if not SILENT_MODE:
+        reply_text(event.reply_token, "✅ 已收到影片，存檔中...")
     threading.Thread(
         target=download_and_save, args=(message_id, chat_id, "video"), daemon=True
     ).start()
@@ -203,7 +208,8 @@ def handle_image(event):
     message_id = event.message.id
     print(f"[LINE] 收到圖片訊息 id={message_id}")
     chat_id = get_chat_id(event)
-    reply_text(event.reply_token, "✅ 已收到圖片，存檔中...")
+    if not SILENT_MODE:
+        reply_text(event.reply_token, "✅ 已收到圖片，存檔中...")
     threading.Thread(
         target=download_and_save, args=(message_id, chat_id, "image"), daemon=True
     ).start()
