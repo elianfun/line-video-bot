@@ -7,11 +7,14 @@
 ## 目錄
 
 - [功能總覽](#功能總覽)
-- [事前準備](#事前準備)
+- [申請 LINE Bot](#申請-line-bot)
+- [申請 Google Cloud 與 Drive 權限](#申請-google-cloud-與-drive-權限)
+- [申請 Telegram Bot](#申請-telegram-bot)
+- [申請 Telegram API ID 與 Hash](#申請-telegram-api-id-與-hash)
 - [Windows 安裝教學](#windows-安裝教學)
 - [Ubuntu Linux 安裝教學](#ubuntu-linux-安裝教學)
 - [設定 .env](#設定-env)
-- [設定 Telegram Channel 發布](#設定-telegram-channel-發布)
+- [設定 Telegram Channel](#設定-telegram-channel)
 - [自架 Telegram Bot API Server（突破 50MB 限制）](#自架-telegram-bot-api-server突破-50mb-限制)
 - [首次授權 Google Drive](#首次授權-google-drive)
 - [使用 ngrok 對外開放](#使用-ngrok-對外開放)
@@ -35,21 +38,158 @@
 
 ---
 
-## 事前準備
+## 申請 LINE Bot
 
-1. **LINE Developers 帳號**，並取得：
-   - `Channel Secret`
-   - `Channel Access Token`
+### 1. 建立 LINE Developers 帳號
 
-2. **Google Cloud 專案**，並取得：
-   - `oauth_credentials.json`（OAuth 2.0 桌面應用程式金鑰）
-   - 已建立好的 Google Drive 資料夾，記下其 **資料夾 ID**（URL 最後一段）
+1. 前往 [LINE Developers Console](https://developers.line.biz/)
+2. 用 LINE 帳號登入
+3. 同意開發者條款
 
-3. **Telegram Bot**（選填）：
-   - 透過 `@BotFather` 建立 Bot，取得 Token
-   - 建立 Channel 並將 Bot 設為管理員
+### 2. 建立 Provider
 
-> ⚠️ 若要搬移到新機器，請一起複製 `oauth_credentials.json` 和 `token.json`，可免去重新 Google 授權的步驟。
+1. 登入後點 **Create a new provider**
+2. 輸入 Provider 名稱（例如你的名字或組織名稱）
+3. 點 **Create**
+
+### 3. 建立 Messaging API Channel
+
+1. 在 Provider 頁面點 **Create a new channel**
+2. 選擇 **Messaging API**
+3. 填入以下資訊：
+   - **Channel name**：Bot 的名稱（會顯示在 LINE 上）
+   - **Channel description**：簡短說明
+   - **Category / Subcategory**：隨意選擇
+4. 勾選同意條款，點 **Create**
+
+### 4. 取得 Channel Secret
+
+1. 進入剛建立的 Channel
+2. 點 **Basic settings** 頁籤
+3. 找到 **Channel secret**，點旁邊的複製按鈕
+4. 記下這串字，填入 `.env` 的 `LINE_CHANNEL_SECRET`
+
+### 5. 取得 Channel Access Token
+
+1. 點 **Messaging API** 頁籤
+2. 滾到最下方找到 **Channel access token**
+3. 點 **Issue** 產生 Token
+4. 複製這串 Token，填入 `.env` 的 `LINE_CHANNEL_ACCESS_TOKEN`
+
+### 6. 將 Bot 加入群組
+
+1. 在 **Messaging API** 頁籤找到 **Bot basic ID**（格式為 `@xxx`）
+2. 在 LINE 群組中加入這個 Bot
+3. 到 [LINE Official Account Manager](https://manager.line.biz/) → **設定** → **回應設定**
+   - 將「加入群組的回應」設為**開啟**
+   - 將「Webhook」設為**開啟**
+
+---
+
+## 申請 Google Cloud 與 Drive 權限
+
+### 1. 建立 Google Cloud 專案
+
+1. 前往 [Google Cloud Console](https://console.cloud.google.com/)
+2. 點上方專案選單 → **新增專案**
+3. 輸入專案名稱（例如 `line-video-bot`），點 **建立**
+
+### 2. 啟用 Google Drive API
+
+1. 進入剛建立的專案
+2. 左側選單點 **API 和服務** → **程式庫**
+3. 搜尋 **Google Drive API**，點進去後點 **啟用**
+
+### 3. 建立 OAuth 2.0 憑證
+
+1. 左側選單點 **API 和服務** → **憑證**
+2. 點上方 **+ 建立憑證** → **OAuth 用戶端 ID**
+3. 若出現「設定同意畫面」提示，先點進去設定：
+   - User Type 選 **外部**，點 **建立**
+   - 填入 App name（隨意）、User support email（你的信箱）
+   - 滾到最下方填 Developer contact email，點 **儲存並繼續**
+   - **範圍** 頁面直接點 **儲存並繼續**
+   - **測試使用者** 頁面點 **+ ADD USERS**，加入你的 Google 帳號，點 **儲存並繼續**
+4. 回到憑證頁面，再次點 **+ 建立憑證** → **OAuth 用戶端 ID**
+5. 應用程式類型選 **桌面應用程式**
+6. 名稱隨意填，點 **建立**
+7. 點 **下載 JSON**，將下載的檔案改名為 `oauth_credentials.json`
+8. 將 `oauth_credentials.json` 放到專案根目錄（`line-video-bot/` 資料夾內）
+
+### 4. 建立 Google Drive 資料夾並取得 ID
+
+1. 前往 [Google Drive](https://drive.google.com/)
+2. 新增一個資料夾（例如 `LINE備份`）
+3. 點進這個資料夾，複製網址列最後一段字串，即為 **資料夾 ID**
+
+```
+https://drive.google.com/drive/folders/1ABCdefGHIjklMNO  ← 這段
+```
+
+4. 填入 `.env` 的 `GOOGLE_DRIVE_FOLDER_ID`
+
+---
+
+## 申請 Telegram Bot
+
+### 1. 建立 Bot
+
+1. 打開 Telegram，搜尋 **`@BotFather`**（有藍色勾勾才是官方）
+2. 點 **Start**，輸入：
+   ```
+   /newbot
+   ```
+3. 輸入 Bot 的**顯示名稱**（例如 `影片備份Bot`）
+4. 輸入 Bot 的 **username**（必須以 `bot` 結尾，例如 `myvideobackup_bot`）
+5. 成功後取得 Token，格式如下：
+   ```
+   123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
+   ```
+6. 填入 `.env` 的 `TELEGRAM_BOT_TOKEN`
+
+### 2. 建立 Telegram Channel
+
+1. Telegram 點左上角鉛筆圖示 → **New Channel**
+2. 填入頻道名稱（例如 `影片備份`）
+3. 類型選 **Private**（私人，之後可改為公開）
+4. 成員可先跳過，直接建立
+
+### 3. 將 Bot 加入 Channel 並設為管理員
+
+1. 進入 Channel → 點頻道名稱 → **Administrators**
+2. 點 **Add Administrator**，搜尋你的 Bot username
+3. 確認 **Post Messages** 有勾選，點 **Save**
+
+### 4. 取得 Channel ID
+
+**私人 Channel：**
+1. 在 Channel 中隨意傳一則訊息
+2. 將這則訊息**轉發**給 `@userinfobot`
+3. userinfobot 回傳類似：`Forwarded from chat #-1001234567890`
+4. 記下這串數字（含負號），填入 `.env` 的 `TELEGRAM_CHANNEL_ID`
+
+**公開 Channel：**
+直接用 `@頻道username` 填入即可。
+
+> ✅ 私人 Channel 隨時可轉為公開：Channel 設定 → **Channel Type** → Public。Channel ID 不變，`.env` 不需要修改。
+
+---
+
+## 申請 Telegram API ID 與 Hash
+
+> 此步驟只有在使用**自架 Telegram Bot API Server**（突破 50MB 限制）時才需要。
+
+1. 前往 [https://my.telegram.org/](https://my.telegram.org/)
+2. 輸入你的 Telegram 手機號碼（含國碼，例如 `+886912345678`）
+3. Telegram 會發送驗證碼，輸入後登入
+4. 點 **API development tools**
+5. 填入：
+   - **App title**：隨意（例如 `linebot`）
+   - **Short name**：隨意（例如 `linebot`，5-32 字元英數字）
+   - 其他欄位留空
+6. 點 **Create application**
+7. 取得 **`App api_id`**（數字）和 **`App api_hash`**（英數字串）
+8. 這兩個值在後面的 Docker 指令中使用
 
 ---
 
@@ -274,34 +414,35 @@ TELEGRAM_CHANNEL_ID=@你的頻道 或 -100xxxxxxxxx
 
 | 變數 | 預設值 | 說明 |
 |------|--------|------|
-| `LINE_CHANNEL_SECRET` | 必填 | LINE Developers 後台取得 |
-| `LINE_CHANNEL_ACCESS_TOKEN` | 必填 | LINE Developers 後台取得 |
+| `LINE_CHANNEL_SECRET` | 必填 | LINE Developers → Basic settings → Channel secret |
+| `LINE_CHANNEL_ACCESS_TOKEN` | 必填 | LINE Developers → Messaging API → Channel access token |
 | `GOOGLE_DRIVE_FOLDER_ID` | 選填 | Drive 資料夾網址最後一段 |
-| `SAVE_LOCAL` | `true` | 保留本機備份 |
+| `SAVE_LOCAL` | `true` | 保留本機備份於 `downloads/` |
 | `UPLOAD_DRIVE` | `false` | 啟用上傳 Google Drive |
-| `SILENT_MODE` | `false` | 靜默模式，不發送 LINE 通知（錯誤除外） |
-| `ENABLE_VIDEO` | `true` | 是否處理影片 |
-| `ENABLE_IMAGE` | `true` | 是否處理圖片 |
-| `TELEGRAM_BOT_TOKEN` | 選填 | BotFather 取得，留空則不發布 |
-| `TELEGRAM_CHANNEL_ID` | 選填 | `@mychannel` 或 `-100xxxxxxxxx` |
+| `SILENT_MODE` | `false` | 靜默模式，不發送 LINE 通知（錯誤仍會通知） |
+| `ENABLE_VIDEO` | `true` | 是否接收並處理影片 |
+| `ENABLE_IMAGE` | `true` | 是否接收並處理圖片 |
+| `TELEGRAM_BOT_TOKEN` | 選填 | BotFather 取得，留空則不發布到 Telegram |
+| `TELEGRAM_CHANNEL_ID` | 選填 | `@mychannel`（公開）或 `-100xxxxxxxxx`（私人） |
 
-> ⚠️ 修改 `.env` 後必須重新啟動 Bot 才會生效。
+> ⚠️ 修改 `.env` 後必須重新啟動 Bot 才會生效：
+> ```bash
+> pkill -f "python app.py"
+> nohup python app.py > bot.log 2>&1 &
+> ```
 
 ---
 
-## 設定 Telegram Channel 發布
+## 設定 Telegram Channel
 
-1. 在 Telegram 找 `@BotFather`，輸入 `/newbot` 建立 Bot，取得 `BOT_TOKEN`
-2. 建立 Channel（公開或私人皆可）
-3. 將 Bot 加入 Channel，設為**管理員**（需有「發布訊息」權限）
-4. 取得 Channel ID：
-   - 公開 Channel：直接用 `@channel_username`
-   - 私人 Channel：將任一訊息轉發給 `@userinfobot`，取得格式為 `-100xxxxxxxxx` 的數字 ID
-5. 填入 `.env` 的 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHANNEL_ID`
+詳細申請步驟請參考上方 [申請 Telegram Bot](#申請-telegram-bot) 章節。
+
+設定完成後確認：
+- Bot 已加入 Channel 並設為管理員
+- `.env` 已填入 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHANNEL_ID`
+- 重新啟動 Bot
 
 > ⚠️ 標準 Telegram Bot API 單檔上傳限制為 **50MB**。超過請參考下方自架 Server 教學。
-
-> ✅ 私人 Channel 隨時可以轉為公開，Channel ID 不會改變，`.env` 不需要修改。
 
 ---
 
@@ -317,12 +458,9 @@ sudo systemctl start docker
 sudo systemctl enable docker
 ```
 
-### 2. 申請 Telegram API 憑證
+### 2. 確認已取得 API ID 與 Hash
 
-1. 前往 [https://my.telegram.org/](https://my.telegram.org/) 用手機號碼登入
-2. 點 **API development tools**
-3. 填入 App title 和 Short name（隨意填，例如 `linebot`）
-4. 點 **Create application**，取得 `api_id` 和 `api_hash`
+請先完成 [申請 Telegram API ID 與 Hash](#申請-telegram-api-id-與-hash) 章節。
 
 ### 3. 啟動本機 Bot API Server
 
@@ -347,7 +485,7 @@ sudo docker ps
 
 > ✅ 已設定 `--restart always`，重開機後 Docker 會自動重啟 Server。
 
-### 4. 重啟後確認 Docker 自動啟動
+### 4. 確認 Docker 開機自動啟動
 
 ```bash
 sudo systemctl enable docker
@@ -360,10 +498,10 @@ sudo systemctl enable docker
 若沒有一起複製 `token.json`，首次執行時會自動開啟瀏覽器進行 Google 授權：
 
 1. 瀏覽器彈出 Google 登入頁面
-2. 選擇有 Drive 權限的 Google 帳號
+2. 選擇有 Drive 權限的 Google 帳號（與 `oauth_credentials.json` 同一個帳號）
 3. 授權完成後，`token.json` 會自動產生，之後不需要再授權
 
-> ⚠️ Ubuntu 無頭伺服器（無桌面環境）無法直接開瀏覽器。建議先在有桌面的機器執行一次產生 `token.json`，再把這個檔案複製到伺服器。
+> ⚠️ Ubuntu 無頭伺服器（無桌面環境）無法直接開瀏覽器。建議先在有桌面的機器執行一次 `python app.py` 完成授權，產生 `token.json` 後，再把這個檔案複製到伺服器的專案目錄。
 
 ---
 
@@ -371,24 +509,39 @@ sudo systemctl enable docker
 
 LINE Webhook 需要 HTTPS 公開網址。若沒有固定 IP 或域名，可用 ngrok。
 
-**Ubuntu 安裝：**
+### 安裝 ngrok
+
+**Windows：**
+
+前往 [https://ngrok.com/download](https://ngrok.com/download) 下載，解壓縮後執行。
+
+**Ubuntu：**
 
 ```bash
 curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
 echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
 sudo apt update && sudo apt install ngrok
+```
+
+### 註冊並設定 authtoken
+
+1. 前往 [https://dashboard.ngrok.com/signup](https://dashboard.ngrok.com/signup) 免費註冊
+2. 登入後到 [Your Authtoken](https://dashboard.ngrok.com/get-started/your-authtoken) 複製 token
+3. 執行（只需一次）：
+
+```bash
 ngrok config add-authtoken 你的token
 ```
 
-**啟動：**
+### 啟動 ngrok
 
 ```bash
 ngrok http 5000
 ```
 
-複製 `https://` 開頭的網址，填入 LINE Webhook。
+啟動後複製 `https://` 開頭的網址，填入 LINE Webhook。
 
-**常見錯誤 ERR_NGROK_334（endpoint already online）：**
+### 常見錯誤 ERR_NGROK_334（endpoint already online）
 
 ```bash
 pkill ngrok
@@ -405,8 +558,11 @@ ngrok http 5000
 1. 前往 [LINE Developers Console](https://developers.line.biz/)
 2. 選擇你的 Messaging API Channel
 3. 進入 **Messaging API** 頁籤
-4. 在 **Webhook URL** 填入：`https://你的ngrok網址/callback`
-5. 點擊 **Verify** 確認連線成功
+4. 在 **Webhook URL** 填入：
+   ```
+   https://你的ngrok網址/callback
+   ```
+5. 點擊 **Verify** 確認連線成功（需確保 Bot 已在執行中）
 6. 開啟 **Use webhook** 開關
 
 ---
@@ -432,10 +588,13 @@ ngrok http 5000
 請參考 [自架 Telegram Bot API Server](#自架-telegram-bot-api-server突破-50mb-限制) 章節，安裝本機 Server 可支援最大 2GB。
 
 **Q: 重開機後 Bot 沒有自動啟動？**  
-建議改用 systemd 管理（見 [方法 C](#方法-c：systemd推薦開機自動啟動自動重啟)）。若使用 nohup，重開機後需手動重新執行啟動指令。
+建議改用 systemd 管理（見方法 C）。若使用 nohup，重開機後需手動重新執行啟動指令。
 
 **Q: 重開機後 Telegram Bot API Server 沒有啟動？**  
 確認 Docker 服務已設定自動啟動：`sudo systemctl enable docker`。Container 本身已設定 `--restart always`，Docker 啟動後會自動重啟。
+
+**Q: Google Cloud 憑證設定同意畫面時出現警告？**  
+因為是個人使用的「外部」應用程式，Google 會顯示「未驗證的應用程式」警告。點「繼續」即可，這是正常現象，不影響功能。
 
 ---
 
@@ -468,3 +627,7 @@ Bot API 上傳影片時若不帶寬高資訊，Telegram 不知道影片比例，
 ### 7. 敏感憑證保護
 
 `.env` 存放所有 Token 和 Secret，透過 `.gitignore` 確保不會被 commit 到 GitHub。`oauth_credentials.json` 和 `token.json` 同樣列在 `.gitignore`。公開 repo 上永遠不會有真實憑證。
+
+### 8. Bot API vs Telegram 客戶端的差異
+
+透過 Bot API 上傳的影片與用手機 App 直接上傳的影片，在 Telegram 的渲染方式不同：客戶端上傳時 Telegram 會自動處理影片元數據，Bot 上傳則需要手動帶入寬高等資訊。兩者使用不同的底層協議（Bot API vs MTProto），這也是為什麼 Bot 上傳有 50MB 限制而客戶端沒有。
