@@ -11,6 +11,7 @@
 - [申請 Google Cloud 與 Drive 權限](#申請-google-cloud-與-drive-權限)
 - [申請 Telegram Bot](#申請-telegram-bot)
 - [申請 Telegram API ID 與 Hash](#申請-telegram-api-id-與-hash)
+- [Linux 伺服器遷移](#linux-伺服器遷移)
 - [Windows 安裝教學](#windows-安裝教學)
 - [Ubuntu Linux 安裝教學](#ubuntu-linux-安裝教學)
 - [設定 .env](#設定-env)
@@ -190,6 +191,92 @@ https://drive.google.com/drive/folders/1ABCdefGHIjklMNO  ← 這段
 6. 點 **Create application**
 7. 取得 **`App api_id`**（數字）和 **`App api_hash`**（英數字串）
 8. 這兩個值在後面的 Docker 指令中使用
+
+---
+
+## Linux 伺服器遷移
+
+當需要搬移到另一台 Linux 時，只需備份三個檔案，其餘從 GitHub 重新安裝即可。
+
+### 1. 在舊機器備份以下三個檔案
+
+| 檔案 | 說明 |
+|------|------|
+| `.env` | 所有 Token 和設定 |
+| `oauth_credentials.json` | Google Cloud OAuth 憑證 |
+| `token.json` | Google 授權快取，沒有需重新跑瀏覽器授權 |
+
+從舊機器複製到本機（在 Windows 執行）：
+
+```powershell
+scp 使用者@舊伺服器IP:~/line-video-bot/.env .
+scp 使用者@舊伺服器IP:~/line-video-bot/oauth_credentials.json .
+scp 使用者@舊伺服器IP:~/line-video-bot/token.json .
+```
+
+### 2. 在新機器安裝環境
+
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv git ffmpeg docker.io -y
+sudo systemctl enable docker
+sudo systemctl start docker
+```
+
+### 3. Clone 專案
+
+```bash
+git clone https://github.com/elianfun/line-video-bot.git
+cd line-video-bot
+```
+
+### 4. 上傳備份檔案到新機器
+
+從 Windows 本機執行：
+
+```powershell
+scp .env 使用者@新伺服器IP:~/line-video-bot/
+scp oauth_credentials.json 使用者@新伺服器IP:~/line-video-bot/
+scp token.json 使用者@新伺服器IP:~/line-video-bot/
+```
+
+### 5. 建立虛擬環境並安裝套件
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 6. 啟動 Telegram Bot API Server
+
+```bash
+sudo docker run -d \
+  --name telegram-bot-api \
+  --restart always \
+  -p 8081:8081 \
+  -v telegram-bot-api-data:/var/lib/telegram-bot-api \
+  -e TELEGRAM_API_ID=你的api_id \
+  -e TELEGRAM_API_HASH=你的api_hash \
+  aiogram/telegram-bot-api
+```
+
+### 7. 啟動 Bot
+
+```bash
+nohup python app.py > bot.log 2>&1 &
+nohup ngrok http 5000 > ngrok.log 2>&1 &
+```
+
+### 8. 更新 LINE Webhook
+
+取得新的 ngrok 網址：
+
+```bash
+curl http://localhost:4040/api/tunnels
+```
+
+到 [LINE Developers Console](https://developers.line.biz/) 更新 Webhook URL 為新網址。
 
 ---
 
