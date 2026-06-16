@@ -2,6 +2,7 @@ import asyncio
 import os
 import queue
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -187,6 +188,8 @@ def download_and_save(message_id: str, chat_id: str, media_type: str):
             except Exception as e:
                 print(f"[Telegram] 發布失敗：{e}")
                 push_text(chat_id, "❌ Telegram 發布失敗，請檢查設定。")
+            finally:
+                time.sleep(3)
 
     except Exception as e:
         print(f"[錯誤] 處理失敗 (id={message_id})：{e}")
