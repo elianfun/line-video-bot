@@ -112,7 +112,7 @@ def upload_to_drive(file_path: Path, mimetype: str):
 
 
 def post_to_telegram(file_path: Path, mimetype: str, caption: str):
-    bot = Bot(token=TELEGRAM_BOT_TOKEN, base_url="http://localhost:8081")
+    bot = Bot(token=TELEGRAM_BOT_TOKEN, base_url="http://localhost:8081/bot")
 
     async def _send():
         with open(file_path, "rb") as f:
