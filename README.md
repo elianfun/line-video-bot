@@ -683,6 +683,80 @@ ngrok http 5000
 **Q: Google Cloud 憑證設定同意畫面時出現警告？**  
 因為是個人使用的「外部」應用程式，Google 會顯示「未驗證的應用程式」警告。點「繼續」即可，這是正常現象，不影響功能。
 
+**Q: Google Drive Token 每 7 天就失效（invalid_grant）？**  
+OAuth 同意畫面的發布狀態若是「測試中」，refresh token 只有 7 天有效期，到期後 Bot 會無法上傳 Drive。解決方法：到 [Google Cloud Console](https://console.cloud.google.com/) → API 和服務 → OAuth 同意畫面 → 點「發布應用程式」改為正式版，之後 refresh token 就不會再自動失效。改完後需重新授權一次（見下方「重新授權 Google Drive」章節）。
+
+**Q: Telegram 全部發布失敗（ConnectError）？**  
+app.py 透過 `http://localhost:8081/bot` 連接本機 Telegram Bot API Server，若 Docker Container 未啟動就會連線失敗。確認方式：`sudo docker ps` 看 `telegram-bot-api` 是否在運行。若沒有，執行 `sudo docker start telegram-bot-api` 重新啟動。
+
+**Q: LINE 回覆通知出現 429 Too Many Requests（You have reached your monthly limit）？**  
+LINE 免費方案每月只能發送 200 則 push message，Bot 每次處理完影片都會回覆通知給群組，很快就超限。解決方法：在 `.env` 設定 `SILENT_MODE=true`，Bot 就不再發送 LINE 通知（錯誤訊息仍會通知），不會消耗月配額。
+
+**Q: line-bot-sdk 安裝後啟動出現 SyntaxError？**  
+`line-bot-sdk==3.14.0` 的自動產生程式碼有語法錯誤，無法啟動。降版至穩定版本即可：
+```bash
+source venv/bin/activate
+pip install "line-bot-sdk==3.13.0"
+```
+
+---
+
+## 重新授權 Google Drive
+
+當 `token.json` 失效（出現 `invalid_grant` 錯誤）時，需要重新授權。因伺服器無桌面環境，使用以下流程：
+
+### 1. 刪除舊 token
+
+```bash
+rm ~/line-video-bot/token.json
+```
+
+### 2. 產生授權網址
+
+```bash
+cd ~/line-video-bot
+source venv/bin/activate
+python3 -c "
+from google_auth_oauthlib.flow import InstalledAppFlow
+flow = InstalledAppFlow.from_client_secrets_file(
+    'oauth_credentials.json',
+    ['https://www.googleapis.com/auth/drive.file'],
+    redirect_uri='http://localhost'
+)
+auth_url, _ = flow.authorization_url(prompt='consent')
+print(auth_url)
+"
+```
+
+### 3. 瀏覽器開啟網址授權
+
+複製印出的網址，用瀏覽器開啟並登入 Google 帳號授權。授權後瀏覽器會跳到 `http://localhost/?code=...` 顯示無法連線，這是正常的，複製網址列中 `code=` 後面的完整字串。
+
+### 4. 用授權碼換取 token
+
+將 `你的授權碼` 替換為上一步複製的內容：
+
+```bash
+python3 -c "
+from google_auth_oauthlib.flow import InstalledAppFlow
+from pathlib import Path
+flow = InstalledAppFlow.from_client_secrets_file(
+    'oauth_credentials.json',
+    ['https://www.googleapis.com/auth/drive.file'],
+    redirect_uri='http://localhost'
+)
+flow.fetch_token(code='你的授權碼')
+Path('token.json').write_text(flow.credentials.to_json())
+print('授權成功！')
+"
+```
+
+### 5. 重啟 Bot
+
+```bash
+sudo systemctl restart line-video-bot
+```
+
 ---
 
 ## 實作知識點
