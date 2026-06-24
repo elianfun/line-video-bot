@@ -488,7 +488,6 @@ journalctl -u line-video-bot -f       # 即時 log
 LINE_CHANNEL_SECRET=你的_Channel_Secret
 LINE_CHANNEL_ACCESS_TOKEN=你的_Channel_Access_Token
 GOOGLE_DRIVE_FOLDER_ID=你的_Google_Drive_資料夾_ID
-SAVE_LOCAL=true
 UPLOAD_DRIVE=true
 SILENT_MODE=false
 ENABLE_VIDEO=true
@@ -504,7 +503,6 @@ TELEGRAM_CHANNEL_ID=@你的頻道 或 -100xxxxxxxxx
 | `LINE_CHANNEL_SECRET` | 必填 | LINE Developers → Basic settings → Channel secret |
 | `LINE_CHANNEL_ACCESS_TOKEN` | 必填 | LINE Developers → Messaging API → Channel access token |
 | `GOOGLE_DRIVE_FOLDER_ID` | 選填 | Drive 資料夾網址最後一段 |
-| `SAVE_LOCAL` | `true` | 保留本機備份於 `downloads/` |
 | `UPLOAD_DRIVE` | `false` | 啟用上傳 Google Drive |
 | `SILENT_MODE` | `false` | 靜默模式，不發送 LINE 通知（錯誤仍會通知） |
 | `ENABLE_VIDEO` | `true` | 是否接收並處理影片 |
