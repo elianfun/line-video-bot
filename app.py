@@ -42,7 +42,6 @@ app = Flask(__name__)
 LINE_CHANNEL_SECRET = os.environ["LINE_CHANNEL_SECRET"]
 LINE_CHANNEL_ACCESS_TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 GOOGLE_DRIVE_FOLDER_ID = os.environ.get("GOOGLE_DRIVE_FOLDER_ID", "")
-SAVE_LOCAL = os.environ.get("SAVE_LOCAL", "true").lower() == "true"
 UPLOAD_DRIVE = os.environ.get("UPLOAD_DRIVE", "false").lower() == "true"
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -148,7 +147,6 @@ def post_to_telegram(file_path: Path, mimetype: str, caption: str):
     print(f"[Telegram] 已發布：{file_path.name}")
 
 
-
 def get_chat_id(event) -> str:
     source = event.source
     return getattr(source, "group_id", None) or source.user_id
@@ -190,29 +188,40 @@ def download_and_save(message_id: str, chat_id: str, media_type: str):
 
         file_path.write_bytes(content)
         print(f"[本地] 已儲存：{file_path}")
-        if not SILENT_MODE:
-            push_text(chat_id, f"📁 已存檔：{filename}")
-
-        if UPLOAD_DRIVE and GOOGLE_DRIVE_FOLDER_ID:
-            upload_to_drive(file_path, mimetype=mimetype)
-            if not SILENT_MODE:
-                push_text(chat_id, "☁️ 已上傳至 Google 雲端硬碟")
-            if not SAVE_LOCAL:
-                file_path.unlink()
-                print(f"[本地] 已刪除暫存：{file_path.name}")
 
         caption = f"📅 {timestamp_caption}"
+        tasks_needed = 0
+        tasks_ok = 0
+
+        if UPLOAD_DRIVE and GOOGLE_DRIVE_FOLDER_ID:
+            tasks_needed += 1
+            try:
+                upload_to_drive(file_path, mimetype=mimetype)
+                tasks_ok += 1
+                if not SILENT_MODE:
+                    push_text(chat_id, "☁️ 已上傳至 Google 雲端硬碟")
+            except Exception as e:
+                print(f"[Drive] 上傳失敗：{e}")
+                push_text(chat_id, "❌ Google Drive 上傳失敗，本地檔案保留。")
 
         if TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID:
+            tasks_needed += 1
             try:
                 post_to_telegram(file_path, mimetype, caption)
+                tasks_ok += 1
                 if not SILENT_MODE:
                     push_text(chat_id, "📢 已發布到 Telegram Channel")
             except Exception as e:
                 print(f"[Telegram] 發布失敗：{e}")
-                push_text(chat_id, "❌ Telegram 發布失敗，請檢查設定。")
+                push_text(chat_id, "❌ Telegram 發布失敗，本地檔案保留。")
             finally:
                 time.sleep(10)
+
+        if tasks_needed > 0 and tasks_ok == tasks_needed:
+            file_path.unlink()
+            print(f"[本地] 已刪除：{file_path.name}")
+        elif tasks_needed > 0:
+            print(f"[本地] 保留：{file_path.name}（有操作失敗）")
 
     except Exception as e:
         print(f"[錯誤] 處理失敗 (id={message_id})：{e}")
